@@ -1,34 +1,40 @@
 import os
 import pickle
 import numpy as np
-from flask import Flask, request, render_template_string
+import pandas as pd
+from flask import Flask, render_template_string, request, jsonify
 
 app = Flask(__name__)
 
-# Load the SVR model from the pickle file
-MODEL_PATH = 'SVR_model.pkl'
-model = None
+# Load the SVR Model
+MODEL_PATH = "SVR_model.pkl"
 
-if os.path.exists(MODEL_PATH):
-    with open(MODEL_PATH, 'rb') as file:
-        model = pickle.load(file)
-else:
-    print(f"Warning: {MODEL_PATH} not found. Ensure it is placed in the root directory.")
+def load_model():
+    if os.path.exists(MODEL_PATH):
+        with open(MODEL_PATH, "rb") as f:
+            return pickle.load(f)
+    return None
 
+model = load_model()
+
+# HTML + CSS + JS Template
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SVR Model Predictor</title>
+    <title>⚡ SVR Revenue Predictor</title>
+    <!-- Google Fonts & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
         :root {
-            --bg-gradient: linear-gradient(-45deg, #0f172a, #1e1b4b, #311042, #0f172a);
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%);
             --glass-bg: rgba(255, 255, 255, 0.05);
             --glass-border: rgba(255, 255, 255, 0.12);
-            --accent-color: #6366f1;
-            --accent-hover: #4f46e5;
+            --accent-glow: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
         }
@@ -37,38 +43,50 @@ HTML_TEMPLATE = """
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
         body {
-            min-height: 100vh;
             background: var(--bg-gradient);
-            background-size: 400% 400%;
-            animation: gradientBG 15s ease infinite;
+            min-height: 100vh;
             display: flex;
-            align-items: center;
             justify-content: center;
-            padding: 20px;
+            align-items: center;
+            padding: 2rem 1rem;
             color: var(--text-main);
+            overflow-x: hidden;
         }
 
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+        /* Floating Background Spheres */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(90px);
+            z-index: 0;
+            pointer-events: none;
+            animation: float 10s ease-in-out infinite alternate;
+        }
+        .orb-1 { width: 350px; height: 350px; background: rgba(99, 102, 241, 0.3); top: -50px; left: -50px; }
+        .orb-2 { width: 400px; height: 400px; background: rgba(236, 72, 153, 0.25); bottom: -100px; right: -50px; animation-delay: -5s; }
+
+        @keyframes float {
+            0% { transform: translateY(0) scale(1); }
+            100% { transform: translateY(-30px) scale(1.08); }
         }
 
-        .card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid var(--glass-border);
-            border-radius: 24px;
-            padding: 40px;
+        .container {
+            position: relative;
+            z-index: 1;
             width: 100%;
-            max-width: 500px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            max-width: 900px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            padding: 2.5rem;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
+            animation: fadeIn 0.8s ease-out;
         }
 
         @keyframes fadeIn {
@@ -76,176 +94,275 @@ HTML_TEMPLATE = """
             to { opacity: 1; transform: translateY(0); }
         }
 
-        h2 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            margin-bottom: 8px;
-            background: linear-gradient(to right, #818cf8, #c084fc);
+        .header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .header h1 {
+            font-size: 2.4rem;
+            font-weight: 800;
+            background: var(--accent-glow);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
         }
 
-        p.subtitle {
+        .header p {
             color: var(--text-muted);
-            font-size: 0.95rem;
-            margin-bottom: 28px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-        }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 14px 18px;
-            background: rgba(255, 255, 255, 0.07);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            color: var(--text-main);
             font-size: 1rem;
+        }
+
+        .grid-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .input-group label {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 0.85rem 1.1rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            color: #fff;
+            font-size: 0.95rem;
             outline: none;
             transition: all 0.3s ease;
         }
 
-        input[type="text"]:focus {
-            border-color: var(--accent-color);
-            background: rgba(255, 255, 255, 0.12);
-            box-shadow: 0 0 15px rgba(99, 102, 241, 0.3);
+        .input-group input:focus, .input-group select:focus {
+            border-color: #a855f7;
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
+            background: rgba(15, 23, 42, 0.8);
         }
 
-        button {
-            width: 100%;
-            padding: 14px;
-            background: var(--accent-color);
-            color: #ffffff;
+        .btn-submit {
+            grid-column: 1 / -1;
+            margin-top: 1rem;
+            padding: 1rem;
             border: none;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
+            border-radius: 16px;
+            background: var(--accent-glow);
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
-            margin-top: 10px;
+            box-shadow: 0 10px 25px rgba(168, 85, 247, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.6rem;
         }
 
-        button:hover {
-            background: var(--accent-hover);
+        .btn-submit:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+            box-shadow: 0 15px 30px rgba(168, 85, 247, 0.5);
         }
 
-        button:active {
+        .btn-submit:active {
             transform: translateY(0);
         }
 
-        .result-box {
-            margin-top: 28px;
-            padding: 20px;
-            border-radius: 12px;
-            background: rgba(99, 102, 241, 0.15);
-            border: 1px solid rgba(99, 102, 241, 0.3);
+        /* Result Section */
+        .result-card {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
             text-align: center;
-            animation: pulseIn 0.5s ease;
+            display: none;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-        @keyframes pulseIn {
-            0% { transform: scale(0.95); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
         }
 
-        .result-box h3 {
-            font-size: 0.9rem;
+        .result-card h3 {
+            color: var(--text-muted);
+            font-size: 0.95rem;
             text-transform: uppercase;
-            color: #a5b4fc;
-            margin-bottom: 6px;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
         }
 
-        .result-box p {
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: #ffffff;
+        .result-card .value {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: #4ade80;
+            text-shadow: 0 0 20px rgba(74, 222, 128, 0.3);
         }
 
-        .error-box {
-            margin-top: 20px;
-            padding: 14px;
-            border-radius: 12px;
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
-            font-size: 0.9rem;
-            text-align: center;
+        .spinner {
+            display: none;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>SVR Model Inference</h2>
-        <p class="subtitle">Enter comma-separated features to run prediction</p>
-        
-        <form method="POST" action="/predict">
-            <div class="form-group">
-                <label for="features">Input Features</label>
-                <input type="text" id="features" name="features" placeholder="e.g., 2.5, 3.1, 0.4" required value="{{ input_val or '' }}">
+
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1>✨ SVR Predictive Intelligence</h1>
+            <p>Enter parameters below to estimate projected revenue Analytics 📊</p>
+        </div>
+
+        <form id="predictionForm" class="grid-form">
+            <div class="input-group">
+                <label><i class="fa-solid fa-box-open"></i> Product Category</label>
+                <input type="number" name="product_category" placeholder="e.g. 1" required>
             </div>
-            <button type="submit">Predict Value</button>
+
+            <div class="input-group">
+                <label><i class="fa-solid fa-earth-americas"></i> Region</label>
+                <input type="number" name="region" placeholder="e.g. 2" required>
+            </div>
+
+            <div class="input-group">
+                <label><i class="fa-solid fa-cubes"></i> Quantity</label>
+                <input type="number" name="quantity" placeholder="e.g. 10" required>
+            </div>
+
+            <div class="input-group">
+                <label><i class="fa-solid fa-tag"></i> Unit Price ($)</label>
+                <input type="number" step="0.01" name="unit_price" placeholder="e.g. 49.99" required>
+            </div>
+
+            <div class="input-group">
+                <label><i class="fa-solid fa-credit-card"></i> Payment Method</label>
+                <input type="number" name="payment_method" placeholder="e.g. 1" required>
+            </div>
+
+            <div class="input-group">
+                <label><i class="fa-solid fa-truck"></i> Delivery Days</label>
+                <input type="number" name="delivery_days" placeholder="e.g. 3" required>
+            </div>
+
+            <div class="input-group">
+                <label><i class="fa-solid fa-star"></i> Customer Rating</label>
+                <input type="number" step="0.1" name="customer_rating" min="1" max="5" placeholder="1.0 - 5.0" required>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">
+                <span id="btnText">🚀 Calculate Revenue</span>
+                <div class="spinner" id="btnSpinner"></div>
+            </button>
         </form>
 
-        {% if result is not none %}
-        <div class="result-box">
-            <h3>Predicted Result</h3>
-            <p>{{ result }}</p>
+        <div class="result-card" id="resultCard">
+            <h3>Estimated Revenue Target 🎯</h3>
+            <div class="value" id="resultValue">$0.00</div>
         </div>
-        {% endif %}
-
-        {% if error %}
-        <div class="error-box">
-            {{ error }}
-        </div>
-        {% endif %}
     </div>
+
+    <script>
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = document.getElementById('btnText');
+            const btnSpinner = document.getElementById('btnSpinner');
+            const resultCard = document.getElementById('resultCard');
+            const resultValue = document.getElementById('resultValue');
+
+            // UI State during loading
+            btnText.innerText = "Processing...";
+            btnSpinner.style.display = "block";
+            submitBtn.disabled = true;
+
+            const formData = new FormData(e.target);
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    resultValue.innerText = `$${parseFloat(data.prediction).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                    resultCard.style.display = 'block';
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (err) {
+                alert('An error occurred during calculation. Please check inputs.');
+            } finally {
+                btnText.innerText = "🚀 Calculate Revenue";
+                btnSpinner.style.display = "none";
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
 </body>
 </html>
 """
 
-@app.route('/')
-def home():
-    return render_template_string(HTML_TEMPLATE, result=None, error=None)
+@app.route('/', methods=['GET'])
+def index():
+    return render_template_string(HTML_TEMPLATE)
 
 @app.route('/predict', methods=['POST'])
 def predict():
     if model is None:
-        return render_template_string(HTML_TEMPLATE, result=None, error="Model file SVR_model.pkl not found on server.")
+        return jsonify({'status': 'error', 'message': 'SVR_model.pkl file not loaded on server.'}), 500
 
-    raw_input = request.form.get('features', '')
     try:
-        # Convert comma-separated string to float list
-        features = [float(x.strip()) for x in raw_input.split(',') if x.strip()]
+        # Features matching model training schema
+        features = [
+            float(request.form.get('product_category', 0)),
+            float(request.form.get('region', 0)),
+            float(request.form.get('quantity', 0)),
+            float(request.form.get('unit_price', 0)),
+            float(request.form.get('payment_method', 0)),
+            float(request.form.get('delivery_days', 0)),
+            float(request.form.get('customer_rating', 0))
+        ]
         
-        if not features:
-            raise ValueError("No valid numbers entered.")
-
-        # Reshape for single sample prediction
-        input_data = np.array(features).reshape(1, -1)
+        # Convert to 2D numpy array for model prediction
+        input_data = np.array([features])
         prediction = model.predict(input_data)[0]
-        
-        # Format prediction float nicely
-        formatted_pred = round(float(prediction), 4)
 
-        return render_template_string(HTML_TEMPLATE, result=formatted_pred, error=None, input_val=raw_input)
+        return jsonify({
+            'status': 'success',
+            'prediction': float(prediction)
+        })
 
     except Exception as e:
-        return render_template_string(HTML_TEMPLATE, result=None, error=f"Invalid Input: {str(e)}", input_val=raw_input)
+        return jsonify({'status': 'error', 'message': str(e)}), 400
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
