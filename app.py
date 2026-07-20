@@ -1,31 +1,30 @@
 import os
 import pickle
 import numpy as np
-import pandas as pd
 from flask import Flask, render_template_string, request, jsonify
 
 app = Flask(__name__)
 
-# Load the SVR Model
+# Model Path
 MODEL_PATH = "SVR_model.pkl"
 
-def load_model():
+# Load model using native pickle library
+def load_svr_model():
     if os.path.exists(MODEL_PATH):
         with open(MODEL_PATH, "rb") as f:
             return pickle.load(f)
     return None
 
-model = load_model()
+model = load_svr_model()
 
-# HTML + CSS + JS Template
+# Aesthetic UI with embedded Glassmorphism CSS & Animations
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ SVR Revenue Predictor</title>
-    <!-- Google Fonts & FontAwesome -->
+    <title>✨ SVR Revenue Predictor</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -34,7 +33,7 @@ HTML_TEMPLATE = """
             --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%);
             --glass-bg: rgba(255, 255, 255, 0.05);
             --glass-border: rgba(255, 255, 255, 0.12);
-            --accent-glow: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+            --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
         }
@@ -57,28 +56,28 @@ HTML_TEMPLATE = """
             overflow-x: hidden;
         }
 
-        /* Floating Background Spheres */
+        /* Floating Animated Background Orbs */
         .orb {
             position: fixed;
             border-radius: 50%;
-            filter: blur(90px);
+            filter: blur(80px);
             z-index: 0;
             pointer-events: none;
-            animation: float 10s ease-in-out infinite alternate;
+            animation: floatOrb 10s ease-in-out infinite alternate;
         }
         .orb-1 { width: 350px; height: 350px; background: rgba(99, 102, 241, 0.3); top: -50px; left: -50px; }
         .orb-2 { width: 400px; height: 400px; background: rgba(236, 72, 153, 0.25); bottom: -100px; right: -50px; animation-delay: -5s; }
 
-        @keyframes float {
+        @keyframes floatOrb {
             0% { transform: translateY(0) scale(1); }
             100% { transform: translateY(-30px) scale(1.08); }
         }
 
-        .container {
+        .card-container {
             position: relative;
             z-index: 1;
             width: 100%;
-            max-width: 900px;
+            max-width: 850px;
             background: var(--glass-bg);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
@@ -86,10 +85,10 @@ HTML_TEMPLATE = """
             border-radius: 28px;
             padding: 2.5rem;
             box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
-            animation: fadeIn 0.8s ease-out;
+            animation: cardAppear 0.8s ease-out;
         }
 
-        @keyframes fadeIn {
+        @keyframes cardAppear {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
@@ -100,9 +99,9 @@ HTML_TEMPLATE = """
         }
 
         .header h1 {
-            font-size: 2.4rem;
+            font-size: 2.2rem;
             font-weight: 800;
-            background: var(--accent-glow);
+            background: var(--accent-gradient);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 0.5rem;
@@ -110,7 +109,7 @@ HTML_TEMPLATE = """
 
         .header p {
             color: var(--text-muted);
-            font-size: 1rem;
+            font-size: 0.98rem;
         }
 
         .grid-form {
@@ -134,7 +133,7 @@ HTML_TEMPLATE = """
             gap: 0.5rem;
         }
 
-        .input-group input, .input-group select {
+        .input-group input {
             width: 100%;
             padding: 0.85rem 1.1rem;
             background: rgba(15, 23, 42, 0.6);
@@ -146,10 +145,10 @@ HTML_TEMPLATE = """
             transition: all 0.3s ease;
         }
 
-        .input-group input:focus, .input-group select:focus {
+        .input-group input:focus {
             border-color: #a855f7;
             box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(15, 23, 42, 0.85);
         }
 
         .btn-submit {
@@ -158,7 +157,7 @@ HTML_TEMPLATE = """
             padding: 1rem;
             border: none;
             border-radius: 16px;
-            background: var(--accent-glow);
+            background: var(--accent-gradient);
             color: #fff;
             font-size: 1.1rem;
             font-weight: 700;
@@ -199,7 +198,7 @@ HTML_TEMPLATE = """
 
         .result-card h3 {
             color: var(--text-muted);
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 0.5rem;
@@ -214,8 +213,8 @@ HTML_TEMPLATE = """
 
         .spinner {
             display: none;
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             border: 3px solid rgba(255,255,255,0.3);
             border-radius: 50%;
             border-top-color: #fff;
@@ -232,10 +231,10 @@ HTML_TEMPLATE = """
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
 
-    <div class="container">
+    <div class="card-container">
         <div class="header">
-            <h1>✨ SVR Predictive Intelligence</h1>
-            <p>Enter parameters below to estimate projected revenue Analytics 📊</p>
+            <h1>📊 SVR Revenue Predictor ⚡</h1>
+            <p>Fill in the parameters below to compute the estimated revenue 💸</p>
         </div>
 
         <form id="predictionForm" class="grid-form">
@@ -281,7 +280,7 @@ HTML_TEMPLATE = """
         </form>
 
         <div class="result-card" id="resultCard">
-            <h3>Estimated Revenue Target 🎯</h3>
+            <h3>Estimated Projected Revenue 🎯</h3>
             <div class="value" id="resultValue">$0.00</div>
         </div>
     </div>
@@ -296,8 +295,7 @@ HTML_TEMPLATE = """
             const resultCard = document.getElementById('resultCard');
             const resultValue = document.getElementById('resultValue');
 
-            // UI State during loading
-            btnText.innerText = "Processing...";
+            btnText.innerText = "Calculating...";
             btnSpinner.style.display = "block";
             submitBtn.disabled = true;
 
@@ -315,10 +313,10 @@ HTML_TEMPLATE = """
                     resultValue.innerText = `$${parseFloat(data.prediction).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
                     resultCard.style.display = 'block';
                 } else {
-                    alert('Error: ' + data.message);
+                    alert('Prediction Error: ' + data.message);
                 }
             } catch (err) {
-                alert('An error occurred during calculation. Please check inputs.');
+                alert('An error occurred during estimation. Check model connection.');
             } finally {
                 btnText.innerText = "🚀 Calculate Revenue";
                 btnSpinner.style.display = "none";
@@ -337,10 +335,10 @@ def index():
 @app.route('/predict', methods=['POST'])
 def predict():
     if model is None:
-        return jsonify({'status': 'error', 'message': 'SVR_model.pkl file not loaded on server.'}), 500
+        return jsonify({'status': 'error', 'message': 'SVR_model.pkl file not found or failed to load.'}), 500
 
     try:
-        # Features matching model training schema
+        # Extract features array matching model input shape
         features = [
             float(request.form.get('product_category', 0)),
             float(request.form.get('region', 0)),
@@ -351,7 +349,6 @@ def predict():
             float(request.form.get('customer_rating', 0))
         ]
         
-        # Convert to 2D numpy array for model prediction
         input_data = np.array([features])
         prediction = model.predict(input_data)[0]
 
@@ -365,4 +362,4 @@ def predict():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port)
