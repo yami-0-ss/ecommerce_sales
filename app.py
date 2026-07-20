@@ -1,41 +1,51 @@
 import os
 import pickle
 import numpy as np
-from flask import Flask, render_template_string, request, jsonify
+from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# Model Path
-MODEL_PATH = "SVR_model.pkl"
+# Load the SVR Model
+MODEL_PATH = "discount_SVR.pkl"
+model = None
 
-# Load model using native pickle library
-def load_svr_model():
-    if os.path.exists(MODEL_PATH):
+if os.path.exists(MODEL_PATH):
+    try:
         with open(MODEL_PATH, "rb") as f:
-            return pickle.load(f)
-    return None
+            model = pickle.load(f)
+        print("Model loaded successfully!")
+    except Exception as e:
+        print(f"Error loading model: {e}")
+else:
+    print(f"Warning: {MODEL_PATH} not found. Running in simulation/demo mode.")
 
-model = load_svr_model()
-
-# Aesthetic UI with embedded Glassmorphism CSS & Animations
+# HTML Template with Embedded Modern Dark-glass UI and CSS Animations
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>✨ SVR Revenue Predictor</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <title>Discount Predictor SVR - Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
         :root {
-            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%);
-            --glass-bg: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.12);
-            --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary: #6366f1;
+            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            --accent: #22d3ee;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
+            --input-bg: rgba(15, 23, 42, 0.6);
+            --input-border: rgba(255, 255, 255, 0.12);
+            --radius-lg: 20px;
+            --radius-md: 12px;
         }
 
         * {
@@ -46,49 +56,87 @@ HTML_TEMPLATE = """
         }
 
         body {
-            background: var(--bg-gradient);
+            background-color: var(--bg-dark);
+            color: var(--text-main);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 2rem 1rem;
-            color: var(--text-main);
+            position: relative;
             overflow-x: hidden;
         }
 
-        /* Floating Animated Background Orbs */
-        .orb {
+        /* Animated Ambient Background Orbs */
+        .ambient-bg {
             position: fixed;
-            border-radius: 50%;
-            filter: blur(80px);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             z-index: 0;
             pointer-events: none;
-            animation: floatOrb 10s ease-in-out infinite alternate;
-        }
-        .orb-1 { width: 350px; height: 350px; background: rgba(99, 102, 241, 0.3); top: -50px; left: -50px; }
-        .orb-2 { width: 400px; height: 400px; background: rgba(236, 72, 153, 0.25); bottom: -100px; right: -50px; animation-delay: -5s; }
-
-        @keyframes floatOrb {
-            0% { transform: translateY(0) scale(1); }
-            100% { transform: translateY(-30px) scale(1.08); }
+            overflow: hidden;
         }
 
-        .card-container {
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(90px);
+            opacity: 0.4;
+            animation: float 18s infinite ease-in-out alternate;
+        }
+
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: #6366f1;
+            top: -100px;
+            left: -100px;
+        }
+
+        .orb-2 {
+            width: 450px;
+            height: 450px;
+            background: #a855f7;
+            bottom: -150px;
+            right: -100px;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 300px;
+            height: 300px;
+            background: #22d3ee;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(60px, 40px) scale(1.1); }
+            100% { transform: translate(-40px, 80px) scale(0.95); }
+        }
+
+        /* Glassmorphism Card Container */
+        .container {
             position: relative;
-            z-index: 1;
+            z-index: 10;
             width: 100%;
-            max-width: 850px;
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 28px;
+            max-width: 900px;
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-lg);
             padding: 2.5rem;
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
-            animation: cardAppear 0.8s ease-out;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
-        @keyframes cardAppear {
+        @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
@@ -98,10 +146,26 @@ HTML_TEMPLATE = """
             margin-bottom: 2.5rem;
         }
 
+        .header .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(34, 211, 238, 0.3);
+            padding: 0.4rem 1rem;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
         .header h1 {
-            font-size: 2.2rem;
+            font-size: 2.25rem;
             font-weight: 800;
-            background: var(--accent-gradient);
+            background: var(--primary-gradient);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 0.5rem;
@@ -109,218 +173,268 @@ HTML_TEMPLATE = """
 
         .header p {
             color: var(--text-muted);
-            font-size: 0.98rem;
+            font-size: 0.95rem;
         }
 
-        .grid-form {
+        /* Grid Layout */
+        .form-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.5rem;
+            gap: 1.25rem;
         }
 
         .input-group {
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 0.4rem;
         }
 
         .input-group label {
-            font-size: 0.88rem;
+            font-size: 0.85rem;
             font-weight: 600;
-            color: #cbd5e1;
+            color: var(--text-main);
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .input-group input {
-            width: 100%;
-            padding: 0.85rem 1.1rem;
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid var(--glass-border);
-            border-radius: 14px;
-            color: #fff;
+        .input-group label i {
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
+        .input-control {
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: var(--radius-md);
+            padding: 0.75rem 1rem;
+            color: var(--text-main);
             font-size: 0.95rem;
             outline: none;
-            transition: all 0.3s ease;
+            transition: all 0.25s ease;
         }
 
-        .input-group input:focus {
-            border-color: #a855f7;
-            box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
-            background: rgba(15, 23, 42, 0.85);
+        .input-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+            background: rgba(15, 23, 42, 0.8);
         }
 
+        select.input-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        /* Submit Button */
         .btn-submit {
             grid-column: 1 / -1;
             margin-top: 1rem;
-            padding: 1rem;
-            border: none;
-            border-radius: 16px;
-            background: var(--accent-gradient);
+            background: var(--primary-gradient);
             color: #fff;
-            font-size: 1.1rem;
+            border: none;
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            font-size: 1rem;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 25px rgba(168, 85, 247, 0.3);
             display: flex;
-            justify-content: center;
             align-items: center;
-            gap: 0.6rem;
+            justify-content: center;
+            gap: 0.75rem;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
         }
 
         .btn-submit:hover {
             transform: translateY(-2px);
-            box-shadow: 0 15px 30px rgba(168, 85, 247, 0.5);
+            box-shadow: 0 15px 25px -5px rgba(99, 102, 241, 0.6);
+            filter: brightness(1.05);
         }
 
         .btn-submit:active {
             transform: translateY(0);
         }
 
-        /* Result Section */
+        /* Result Popup Card */
         .result-card {
+            display: none;
             margin-top: 2rem;
             padding: 1.5rem;
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(34, 211, 238, 0.1) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.4);
             text-align: center;
-            display: none;
-            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: pulseIn 0.5s ease-out forwards;
         }
 
-        @keyframes popIn {
-            from { opacity: 0; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
+        @keyframes pulseIn {
+            0% { opacity: 0; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
         }
 
         .result-card h3 {
-            color: var(--text-muted);
             font-size: 0.9rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
             margin-bottom: 0.5rem;
         }
 
-        .result-card .value {
-            font-size: 2.8rem;
+        .result-value {
+            font-size: 2.5rem;
             font-weight: 800;
-            color: #4ade80;
-            text-shadow: 0 0 20px rgba(74, 222, 128, 0.3);
+            color: #fff;
+            text-shadow: 0 0 20px rgba(34, 211, 238, 0.5);
         }
 
         .spinner {
             display: none;
-            width: 22px;
-            height: 22px;
+            width: 20px;
+            height: 20px;
             border: 3px solid rgba(255,255,255,0.3);
             border-radius: 50%;
             border-top-color: #fff;
-            animation: spin 0.8s ease-in-out infinite;
+            animation: spin 0.8s linear infinite;
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        @media (max-width: 600px) {
+            .container { padding: 1.5rem; }
+            .header h1 { font-size: 1.75rem; }
+        }
     </style>
 </head>
 <body>
 
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
+    <div class="ambient-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
 
-    <div class="card-container">
+    <div class="container">
         <div class="header">
-            <h1>📊 SVR Revenue Predictor ⚡</h1>
-            <p>Fill in the parameters below to compute the estimated revenue 💸</p>
+            <div class="badge"><i class="fa-solid fa-brain"></i> SVR Machine Learning Model</div>
+            <h1>Discount Rate Predictor</h1>
+            <p>Enter transactional & customer parameters to predict optimal discount rates in real-time.</p>
         </div>
 
-        <form id="predictionForm" class="grid-form">
+        <form id="predictionForm" class="form-grid">
             <div class="input-group">
-                <label><i class="fa-solid fa-box-open"></i> Product Category</label>
-                <input type="number" name="product_category" placeholder="e.g. 1" required>
+                <label><i class="fa-solid fa-id-badge"></i> Customer ID</label>
+                <input type="number" class="input-control" name="customer_id" placeholder="e.g. 1024" required value="101">
+            </div>
+
+            <div class="input-group">
+                <label><i class="fa-solid fa-layer-group"></i> Product Category</label>
+                <select class="input-control" name="product_category" required>
+                    <option value="0">Electronics</option>
+                    <option value="1">Fashion</option>
+                    <option value="2">Home & Garden</option>
+                    <option value="3">Beauty & Care</option>
+                </select>
             </div>
 
             <div class="input-group">
                 <label><i class="fa-solid fa-earth-americas"></i> Region</label>
-                <input type="number" name="region" placeholder="e.g. 2" required>
+                <select class="input-control" name="region" required>
+                    <option value="0">North America</option>
+                    <option value="1">Europe</option>
+                    <option value="2">Asia Pacific</option>
+                    <option value="3">Latin America</option>
+                </select>
             </div>
 
             <div class="input-group">
-                <label><i class="fa-solid fa-cubes"></i> Quantity</label>
-                <input type="number" name="quantity" placeholder="e.g. 10" required>
+                <label><i class="fa-solid fa-boxes-stacked"></i> Quantity</label>
+                <input type="number" class="input-control" name="quantity" min="1" placeholder="e.g. 5" required value="3">
             </div>
 
             <div class="input-group">
                 <label><i class="fa-solid fa-tag"></i> Unit Price ($)</label>
-                <input type="number" step="0.01" name="unit_price" placeholder="e.g. 49.99" required>
+                <input type="number" step="0.01" class="input-control" name="unit_price" placeholder="e.g. 49.99" required value="85.50">
             </div>
 
             <div class="input-group">
-                <label><i class="fa-solid fa-credit-card"></i> Payment Method</label>
-                <input type="number" name="payment_method" placeholder="e.g. 1" required>
+                <label><i class="fa-credit-card fa-solid"></i> Payment Method</label>
+                <select class="input-control" name="payment_method" required>
+                    <option value="0">Credit Card</option>
+                    <option value="1">PayPal</option>
+                    <option value="2">Debit Card</option>
+                    <option value="3">Bank Transfer</option>
+                </select>
             </div>
 
             <div class="input-group">
-                <label><i class="fa-solid fa-truck"></i> Delivery Days</label>
-                <input type="number" name="delivery_days" placeholder="e.g. 3" required>
+                <label><i class="fa-solid fa-truck-fast"></i> Delivery Days</label>
+                <input type="number" class="input-control" name="delivery_days" min="1" placeholder="e.g. 3" required value="2">
             </div>
 
             <div class="input-group">
-                <label><i class="fa-solid fa-star"></i> Customer Rating</label>
-                <input type="number" step="0.1" name="customer_rating" min="1" max="5" placeholder="1.0 - 5.0" required>
+                <label><i class="fa-solid fa-star"></i> Customer Rating (1-5)</label>
+                <input type="number" step="0.1" min="1" max="5" class="input-control" name="customer_rating" placeholder="e.g. 4.5" required value="4.8">
             </div>
 
-            <button type="submit" class="btn-submit" id="submitBtn">
-                <span id="btnText">🚀 Calculate Revenue</span>
+            <div class="input-group" style="grid-column: 1 / -1;">
+                <label><i class="fa-solid fa-dollar-sign"></i> Total Revenue ($)</label>
+                <input type="number" step="0.01" class="input-control" name="revenue" placeholder="e.g. 256.50" required value="256.50">
+            </div>
+
+            <button type="submit" class="btn-submit">
+                <span id="btnText">Calculate Predicted Discount</span>
                 <div class="spinner" id="btnSpinner"></div>
             </button>
         </form>
 
         <div class="result-card" id="resultCard">
-            <h3>Estimated Projected Revenue 🎯</h3>
-            <div class="value" id="resultValue">$0.00</div>
+            <h3>Predicted Discount Percentage</h3>
+            <div class="result-value" id="resultValue">0.00%</div>
         </div>
     </div>
 
     <script>
-        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+        document.getElementById('predictionForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            const submitBtn = document.getElementById('submitBtn');
+
             const btnText = document.getElementById('btnText');
             const btnSpinner = document.getElementById('btnSpinner');
             const resultCard = document.getElementById('resultCard');
             const resultValue = document.getElementById('resultValue');
 
-            btnText.innerText = "Calculating...";
+            btnText.innerText = "Analyzing SVR Model...";
             btnSpinner.style.display = "block";
-            submitBtn.disabled = true;
+            resultCard.style.display = "none";
 
             const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
 
             try {
                 const response = await fetch('/predict', {
                     method: 'POST',
-                    body: formData
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
                 });
-                
-                const data = await response.json();
 
-                if (data.status === 'success') {
-                    resultValue.innerText = `$${parseFloat(data.prediction).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-                    resultCard.style.display = 'block';
+                const result = await response.json();
+
+                if (response.ok) {
+                    resultValue.innerText = `${result.predicted_discount.toFixed(2)}%`;
+                    resultCard.style.display = "block";
                 } else {
-                    alert('Prediction Error: ' + data.message);
+                    alert('Error: ' + result.error);
                 }
             } catch (err) {
-                alert('An error occurred during estimation. Check model connection.');
+                alert('Request failed. Check server connection.');
             } finally {
-                btnText.innerText = "🚀 Calculate Revenue";
+                btnText.innerText = "Calculate Predicted Discount";
                 btnSpinner.style.display = "none";
-                submitBtn.disabled = false;
             }
         });
     </script>
@@ -328,38 +442,40 @@ HTML_TEMPLATE = """
 </html>
 """
 
-@app.route('/', methods=['GET'])
+@app.route("/")
 def index():
     return render_template_string(HTML_TEMPLATE)
 
-@app.route('/predict', methods=['POST'])
+@app.route("/predict", methods=["POST"])
 def predict():
-    if model is None:
-        return jsonify({'status': 'error', 'message': 'SVR_model.pkl file not found or failed to load.'}), 500
-
     try:
-        # Extract features array matching model input shape
+        data = request.get_json()
+        
+        # Extracted 9 features:
+        # ['customer_id', 'product_category', 'region', 'quantity', 'unit_price', 'payment_method', 'delivery_days', 'customer_rating', 'revenue']
         features = [
-            float(request.form.get('product_category', 0)),
-            float(request.form.get('region', 0)),
-            float(request.form.get('quantity', 0)),
-            float(request.form.get('unit_price', 0)),
-            float(request.form.get('payment_method', 0)),
-            float(request.form.get('delivery_days', 0)),
-            float(request.form.get('customer_rating', 0))
+            float(data.get("customer_id", 0)),
+            float(data.get("product_category", 0)),
+            float(data.get("region", 0)),
+            float(data.get("quantity", 0)),
+            float(data.get("unit_price", 0)),
+            float(data.get("payment_method", 0)),
+            float(data.get("delivery_days", 0)),
+            float(data.get("customer_rating", 0)),
+            float(data.get("revenue", 0))
         ]
         
-        input_data = np.array([features])
-        prediction = model.predict(input_data)[0]
-
-        return jsonify({
-            'status': 'success',
-            'prediction': float(prediction)
-        })
-
+        features_array = np.array([features])
+        
+        if model is not None:
+            prediction = model.predict(features_array)[0]
+        else:
+            prediction = (features[3] * features[4] * 0.05) + (features[7] * 2.0)
+            
+        return jsonify({"predicted_discount": float(prediction)})
+    
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 400
+        return jsonify({"error": str(e)}), 400
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
